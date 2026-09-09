@@ -1,0 +1,4 @@
+allowBuilds:
+  '@clerk/shared': true
+  '@swc/core': true
+  esbuild: true
