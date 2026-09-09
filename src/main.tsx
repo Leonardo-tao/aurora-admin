@@ -73,9 +73,14 @@ const queryClient = new QueryClient({
   }),
 })
 
+// GitHub Pages 部署在子路径（/<仓库名>/）下，路由 basepath 需与之对齐。
+// 本地开发 BASE_URL 为 '/'，构建时通过 `vite build --base=/aurora-admin/` 注入。
+const basepath = import.meta.env.BASE_URL.replace(/\/+$/, '') || '/'
+
 // Create a new router instance
 const router = createRouter({
   routeTree,
+  basepath,
   context: { queryClient },
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 0,

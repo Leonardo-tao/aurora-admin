@@ -1,0 +1,81 @@
+# 后台管理面板自动部署到 GitHub Pages
+#
+# 触发：push 到 master 分支（或手动运行）
+# 产物：https://leonardo-tao.github.io/aurora-admin/
+#
+# 前置（首次使用需在仓库 Settings → Secrets and variables → Actions 添加）：
+#   VITE_API_BASE             Worker 地址（默认回落到下方硬编码值）
+#   VITE_ADMIN_API_KEY        后台管理 API 密钥（必填，否则所有管理接口 401）
+#   VITE_CLERK_PUBLISHABLE_KEY Clerk 登录密钥（可选，不启用 Clerk 可不配）
+#
+# 页面设置：Settings → Pages → Build and deployment → Source 选 GitHub Actions
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只保留一次部署，避免并发覆盖
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # .env 已被 gitignore，构建前用仓库 Secrets 生成
+      - name: Create .env
+        run: |
+          cat > .env <<EOF
+          VITE_API_BASE=${{ secrets.VITE_API_BASE || 'https://aurora-worker.bbbboy811.workers.dev' }}
+          VITE_ADMIN_API_KEY=${{ secrets.VITE_ADMIN_API_KEY }}
+          VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          EOF
+
+      - name: Install dependencies
+        run: npm ci
+
+      # GitHub Pages 项目站部署在 /aurora-admin/ 子路径下，静态资源需带该前缀
+      - name: Build
+        run: npm run build -- --base=/aurora-admin/
+
+      # GitHub Pages 无 SPA 路由回退：404.html 兜底让前端路由接管深链接
+      - name: SPA fallback
+        run: cp dist/index.html dist/404.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
