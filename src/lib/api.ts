@@ -2,12 +2,30 @@
  * Worker API 客户端（Cloudflare Worker + Hono）。
  *
  * 环境变量（见 .env）：
- * - VITE_API_BASE       Worker 地址，如 https://aurora-worker.xxx.workers.dev
- * - VITE_ADMIN_API_KEY  后台管理密钥（与 Worker 的 ADMIN_API_KEY secret 一致）
+ * - VITE_API_BASE  Worker 地址，如 https://aurora-worker.xxx.workers.dev
+ *
+ * 鉴权：Clerk 登录后的会话令牌（Authorization: Bearer <__session JWT>），
+ * 由 Worker 校验签名与用户白名单；前端不再打包任何静态密钥。
  */
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
-const ADMIN_API_KEY = import.meta.env.VITE_ADMIN_API_KEY ?? ''
+
+/** Clerk 挂载在 window 上的会话句柄（ClerkProvider 就绪后可用） */
+interface ClerkGlobal {
+  session?: {
+    getToken: () => Promise<string | null>
+  }
+}
+
+async function getAuthToken(): Promise<string | null> {
+  const clerk = (globalThis as { Clerk?: ClerkGlobal }).Clerk
+  if (!clerk?.session) return null
+  try {
+    return await clerk.session.getToken()
+  } catch {
+    return null
+  }
+}
 
 export class ApiError extends Error {
   status: number
@@ -22,11 +40,12 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const token = await getAuthToken()
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': ADMIN_API_KEY,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   })

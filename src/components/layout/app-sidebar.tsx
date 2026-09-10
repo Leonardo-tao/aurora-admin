@@ -1,3 +1,4 @@
+import { useUser } from '@clerk/clerk-react'
 import { useLayout } from '@/context/layout-provider'
 import {
   Sidebar,
@@ -14,6 +15,19 @@ import { TeamSwitcher } from './team-switcher'
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
+  const { user: clerkUser } = useUser()
+
+  const user = {
+    name:
+      clerkUser?.fullName ??
+      clerkUser?.username ??
+      sidebarData.user.name,
+    email:
+      clerkUser?.primaryEmailAddress?.emailAddress ??
+      sidebarData.user.email,
+    avatar: clerkUser?.imageUrl ?? sidebarData.user.avatar,
+  }
+
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
       <SidebarHeader>
@@ -29,7 +43,7 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={sidebarData.user} />
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

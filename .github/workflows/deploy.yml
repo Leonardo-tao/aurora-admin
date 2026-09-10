@@ -4,9 +4,8 @@
 # 产物：https://leonardo-tao.github.io/aurora-admin/
 #
 # 前置（首次使用需在仓库 Settings → Secrets and variables → Actions 添加）：
-#   VITE_API_BASE             Worker 地址（默认回落到下方硬编码值）
-#   VITE_ADMIN_API_KEY        后台管理 API 密钥（必填，否则所有管理接口 401）
-#   VITE_CLERK_PUBLISHABLE_KEY Clerk 登录密钥（可选，不启用 Clerk 可不配）
+#   VITE_API_BASE              Worker 地址（默认回落到下方硬编码值）
+#   VITE_CLERK_PUBLISHABLE_KEY Clerk Publishable Key（必填，否则页面提示缺配置且无法登录）
 #
 # 页面设置：Settings → Pages → Build and deployment → Source 选 GitHub Actions
 name: Deploy to GitHub Pages
@@ -49,7 +48,6 @@ jobs:
         run: |
           cat > .env <<EOF
           VITE_API_BASE=${{ secrets.VITE_API_BASE || 'https://aurora-worker.bbbboy811.workers.dev' }}
-          VITE_ADMIN_API_KEY=${{ secrets.VITE_ADMIN_API_KEY }}
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           EOF
 
