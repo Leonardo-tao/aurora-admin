@@ -15,8 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { useCategoriesQuery } from '../data/queries'
-import { uploadPhoto } from '../data/queries'
+import { useCategoriesQuery, useUploadPhoto } from '../data/queries'
 import {
   Select,
   SelectContent,
@@ -38,17 +37,30 @@ function formatShutter(exposureTime?: number): string | null {
   return `1/${Math.round(1 / exposureTime)}`
 }
 
+/** 通过 Image 解码读取真实像素宽高（比 EXIF 字段更可靠，EXIF 可能缺失或与实际不符） */
+function readImageDimensions(
+  url: string
+): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () =>
+      resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
 export function PhotoUploadDialog({
   open,
   onOpenChange,
 }: UploadDialogProps) {
   const { data: categories = [] } = useCategoriesQuery()
+  const uploadMutation = useUploadPhoto()
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const [file, setFile] = React.useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
   const [parsing, setParsing] = React.useState(false)
-  const [uploading, setUploading] = React.useState(false)
 
   const [form, setForm] = React.useState({
     title: '',
@@ -75,7 +87,8 @@ export function PhotoUploadDialog({
       return
     }
     setFile(selected)
-    setPreviewUrl(URL.createObjectURL(selected))
+    const objectUrl = URL.createObjectURL(selected)
+    setPreviewUrl(objectUrl)
     // 标题默认取文件名（去扩展名）
     setForm((f) => ({
       ...f,
@@ -84,6 +97,8 @@ export function PhotoUploadDialog({
 
     // 解析 EXIF（失败不阻塞上传，仅无元数据）
     setParsing(true)
+    // 宽高以浏览器实际解码结果为准，EXIF 字段仅作后备
+    const dimensions = await readImageDimensions(objectUrl)
     try {
       const exif = (await exifr.parse(selected, {
         tiff: true,
@@ -109,21 +124,35 @@ export function PhotoUploadDialog({
           dateTaken: exif.DateTimeOriginal
             ? new Date(exif.DateTimeOriginal as Date).toISOString()
             : null,
-          width: (exif.ExifImageWidth as number) ??
+          width:
+            dimensions?.width ??
+            (exif.ExifImageWidth as number) ??
             (exif.ImageWidth as number) ??
             null,
-          height: (exif.ExifImageHeight as number) ??
+          height:
+            dimensions?.height ??
+            (exif.ExifImageHeight as number) ??
             (exif.ImageHeight as number) ??
             null,
           fileSize: selected.size,
           mimeType: selected.type || 'image/jpeg',
         })
       } else {
-        setExifMeta({ fileSize: selected.size, mimeType: selected.type })
+        setExifMeta({
+          width: dimensions?.width ?? null,
+          height: dimensions?.height ?? null,
+          fileSize: selected.size,
+          mimeType: selected.type,
+        })
       }
     } catch {
       toast.info('未解析到 EXIF 元数据（可能是非 JPEG 或无 EXIF 图片）')
-      setExifMeta({ fileSize: selected.size, mimeType: selected.type })
+      setExifMeta({
+        width: dimensions?.width ?? null,
+        height: dimensions?.height ?? null,
+        fileSize: selected.size,
+        mimeType: selected.type,
+      })
     } finally {
       setParsing(false)
     }
@@ -140,27 +169,26 @@ export function PhotoUploadDialog({
       return
     }
 
-    setUploading(true)
-    try {
-      await uploadPhoto(file, {
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        category: form.category || null,
-        tags: form.tags
-          .split(/[,，]/)
-          .map((t) => t.trim())
-          .filter(Boolean),
-        featured: form.featured,
-        ...exifMeta,
+    const success = await uploadMutation
+      .mutateAsync({
+        file,
+        input: {
+          title: form.title.trim(),
+          description: form.description.trim() || null,
+          category: form.category || null,
+          tags: form.tags
+            .split(/[,，]/)
+            .map((t) => t.trim())
+            .filter(Boolean),
+          featured: form.featured,
+          ...exifMeta,
+        },
       })
-      toast.success('上传成功，原图已存入 R2（EXIF 完整保留）')
-      onOpenChange(false)
-      reset()
-    } catch (error) {
-      toast.error(`上传失败：${(error as Error).message}`)
-    } finally {
-      setUploading(false)
-    }
+      .then(() => true)
+      .catch(() => false)
+    if (!success) return
+    onOpenChange(false)
+    reset()
   }
 
   return (
@@ -324,12 +352,15 @@ export function PhotoUploadDialog({
               type='button'
               variant='outline'
               onClick={() => onOpenChange(false)}
-              disabled={uploading}
+              disabled={uploadMutation.isPending}
             >
               取消
             </Button>
-            <Button type='submit' disabled={!file || parsing || uploading}>
-              {uploading ? (
+            <Button
+              type='submit'
+              disabled={!file || parsing || uploadMutation.isPending}
+            >
+              {uploadMutation.isPending ? (
                 <>
                   <Loader2 className='size-4 animate-spin' />
                   上传中...

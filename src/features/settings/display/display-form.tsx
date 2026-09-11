@@ -1,7 +1,7 @@
 import { z } from 'zod'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { showSubmittedData } from '@/lib/show-submitted-data'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -13,6 +13,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  useUpdateUserSettings,
+  useUserSettingsQuery,
+} from '../data/queries'
 
 const items = [
   {
@@ -55,15 +59,27 @@ const defaultValues: Partial<DisplayFormValues> = {
 }
 
 export function DisplayForm() {
+  const settingsQuery = useUserSettingsQuery()
+  const updateSettings = useUpdateUserSettings()
+
   const form = useForm<DisplayFormValues>({
     resolver: zodResolver(displayFormSchema),
     defaultValues,
   })
 
+  useEffect(() => {
+    const saved = settingsQuery.data?.displayItems
+    if (saved && saved.length > 0) {
+      form.reset({ items: [...saved] })
+    }
+  }, [settingsQuery.data, form])
+
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((data) => showSubmittedData(data))}
+        onSubmit={form.handleSubmit((data) =>
+          updateSettings.mutate({ displayItems: data.items })
+        )}
         className='space-y-8'
       >
         <FormField
@@ -114,7 +130,12 @@ export function DisplayForm() {
             </FormItem>
           )}
         />
-        <Button type='submit'>更新显示设置</Button>
+        <Button
+          type='submit'
+          disabled={updateSettings.isPending}
+        >
+          {updateSettings.isPending ? '保存中...' : '更新显示设置'}
+        </Button>
       </form>
     </Form>
   )

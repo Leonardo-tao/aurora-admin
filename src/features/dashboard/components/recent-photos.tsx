@@ -16,7 +16,7 @@ export function RecentPhotos() {
     )
   }
 
-  const photos = data?.data ?? []
+  const photos = data?.items ?? []
 
   if (!photos.length) {
     return (
@@ -35,14 +35,14 @@ export function RecentPhotos() {
       {photos.map((photo) => (
         <a
           key={photo.id}
-          href={photo.displayUrl}
+          href={photo.urls.display}
           target='_blank'
           rel='noreferrer'
           title={photo.title}
           className='group relative block aspect-square overflow-hidden rounded-md bg-muted'
         >
           <img
-            src={photo.thumbUrl}
+            src={photo.urls.thumb}
             alt={photo.title}
             loading='lazy'
             className='h-full w-full object-cover transition-transform group-hover:scale-105'

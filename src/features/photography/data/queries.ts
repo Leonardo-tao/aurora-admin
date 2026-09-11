@@ -5,10 +5,10 @@ import {
 } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
-import { type PhotoInput } from './types'
 import type {
   NameCount,
   Photo,
+  PhotoInput,
   PhotosQuery,
   PhotosResponse,
   StatsResponse,
@@ -18,6 +18,7 @@ import type {
 export const photoKeys = {
   all: ['photos'] as const,
   list: (query: PhotosQuery) => [...photoKeys.all, 'list', query] as const,
+  detail: (id: string) => [...photoKeys.all, 'detail', id] as const,
   categories: ['photos', 'categories'] as const,
   tags: ['photos', 'tags'] as const,
   stats: ['photos', 'stats'] as const,
@@ -38,6 +39,16 @@ export function usePhotosQuery(query: PhotosQuery) {
       if (query.hasGps) search.set('hasGps', query.hasGps)
       return api.get<PhotosResponse>(`/api/photos?${search.toString()}`)
     },
+    // 对话框打开/关闭引发的窗口焦点变化不应触发列表刷新
+    refetchOnWindowFocus: false,
+  })
+}
+
+export function usePhotoQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: photoKeys.detail(id ?? ''),
+    queryFn: () => api.get<Photo>(`/api/photos/${id}`),
+    enabled: !!id,
   })
 }
 
@@ -45,6 +56,7 @@ export function useCategoriesQuery() {
   return useQuery({
     queryKey: photoKeys.categories,
     queryFn: () => api.get<NameCount[]>('/api/categories'),
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -52,6 +64,7 @@ export function useTagsQuery() {
   return useQuery({
     queryKey: photoKeys.tags,
     queryFn: () => api.get<NameCount[]>('/api/tags'),
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -107,6 +120,20 @@ export function useDeletePhoto() {
       invalidate()
     },
     onError: (error) => toast.error(`删除失败：${error.message}`),
+  })
+}
+
+/** 完整上传流程封装：成功后自动刷新作品缓存 */
+export function useUploadPhoto() {
+  const invalidate = useInvalidatePhotos()
+  return useMutation({
+    mutationFn: ({ file, input }: { file: File; input: PhotoInput }) =>
+      uploadPhoto(file, input),
+    onSuccess: () => {
+      toast.success('上传成功，原图已存入 R2（EXIF 完整保留）')
+      invalidate()
+    },
+    onError: (error) => toast.error(`上传失败：${error.message}`),
   })
 }
 

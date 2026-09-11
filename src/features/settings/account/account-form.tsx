@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { CaretSortIcon, CheckIcon } from '@radix-ui/react-icons'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { showSubmittedData } from '@/lib/show-submitted-data'
+import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,6 +30,10 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { DatePicker } from '@/components/date-picker'
+import {
+  useUpdateUserSettings,
+  useUserSettingsQuery,
+} from '../data/queries'
 
 const languages = [
   { label: '英语', value: 'en' },
@@ -54,19 +59,33 @@ const accountFormSchema = z.object({
 
 type AccountFormValues = z.infer<typeof accountFormSchema>
 
-// This can come from your database or API.
-const defaultValues: Partial<AccountFormValues> = {
-  name: '',
-}
-
 export function AccountForm() {
+  const settingsQuery = useUserSettingsQuery()
+  const updateSettings = useUpdateUserSettings()
+
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
-    defaultValues,
+    defaultValues: { name: '' },
   })
 
+  useEffect(() => {
+    const data = settingsQuery.data
+    if (!data) return
+    form.reset({
+      name: data.name,
+      dob: data.dateOfBirth
+        ? new Date(`${data.dateOfBirth}T00:00:00`)
+        : undefined,
+      language: data.language,
+    })
+  }, [settingsQuery.data, form])
+
   function onSubmit(data: AccountFormValues) {
-    showSubmittedData(data)
+    updateSettings.mutate({
+      name: data.name,
+      dateOfBirth: format(data.dob, 'yyyy-MM-dd'),
+      language: data.language,
+    })
   }
 
   return (
@@ -165,7 +184,12 @@ export function AccountForm() {
             </FormItem>
           )}
         />
-        <Button type='submit'>更新账户</Button>
+        <Button
+          type='submit'
+          disabled={settingsQuery.isPending || updateSettings.isPending}
+        >
+          {updateSettings.isPending ? '保存中...' : '更新账户'}
+        </Button>
       </form>
     </Form>
   )

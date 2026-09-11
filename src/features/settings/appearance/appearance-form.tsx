@@ -1,8 +1,8 @@
 import { z } from 'zod'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { Check } from 'lucide-react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { showSubmittedData } from '@/lib/show-submitted-data'
 import { cn } from '@/lib/utils'
 import {
   type Accent,
@@ -10,6 +10,10 @@ import {
   useAccent,
 } from '@/context/accent-provider'
 import { useTheme } from '@/context/theme-provider'
+import {
+  useUpdateUserSettings,
+  useUserSettingsQuery,
+} from '../data/queries'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -40,8 +44,9 @@ type AppearanceFormValues = z.infer<typeof appearanceFormSchema>
 export function AppearanceForm() {
   const { theme, setTheme } = useTheme()
   const { accent, setAccent } = useAccent()
+  const settingsQuery = useUserSettingsQuery()
+  const updateSettings = useUpdateUserSettings()
 
-  // This can come from your database or API.
   const defaultValues: Partial<AppearanceFormValues> = {
     theme: theme as 'light' | 'dark',
     accent,
@@ -52,11 +57,21 @@ export function AppearanceForm() {
     defaultValues,
   })
 
+  useEffect(() => {
+    const data = settingsQuery.data
+    if (!data) return
+    // 服务器仍为默认值时沿用本地偏好，避免首次使用覆盖已有主题
+    if (data.theme === 'light' && data.accent === 'zinc') return
+    if (data.theme !== theme) setTheme(data.theme)
+    if (data.accent !== accent) setAccent(data.accent as Accent)
+    form.reset({ theme: data.theme, accent: data.accent as Accent })
+  }, [settingsQuery.data])
+
   function onSubmit(data: AppearanceFormValues) {
     if (data.theme !== theme) setTheme(data.theme)
     if (data.accent !== accent) setAccent(data.accent)
 
-    showSubmittedData(data)
+    updateSettings.mutate({ theme: data.theme, accent: data.accent })
   }
 
   return (
@@ -175,7 +190,12 @@ export function AppearanceForm() {
           )}
         />
 
-        <Button type='submit'>更新偏好设置</Button>
+        <Button
+          type='submit'
+          disabled={updateSettings.isPending}
+        >
+          {updateSettings.isPending ? '保存中...' : '更新偏好设置'}
+        </Button>
       </form>
     </Form>
   )

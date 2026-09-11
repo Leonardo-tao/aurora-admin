@@ -5,7 +5,7 @@
 import exifr from 'exifr'
 import { readFileSync, writeFileSync } from 'node:fs'
 
-const API_BASE = 'https://aurora-worker.bbbboy811.workers.dev'
+const API_BASE = 'https://aurora-worker.codercat.top'
 const ADMIN_API_KEY = 'aurora-admin-7a57749aa7ef4fb1a0e2c0cba81c035d'
 const FILE = 'test-photo.jpg'
 const ID_FILE = '.test-photo-id'
@@ -20,7 +20,7 @@ if (cmd === 'create') {
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ filename: FILE }),
   })
-  const presign = await presignRes.json()
+  const presign = (await presignRes.json()).data
   await fetch(presign.uploadUrl, {
     method: 'PUT',
     body: readFileSync(FILE),
@@ -45,7 +45,7 @@ if (cmd === 'create') {
       dateTaken: new Date(exif.DateTimeOriginal).toISOString(),
     }),
   })
-  const photo = await createRes.json()
+  const photo = (await createRes.json()).data
   writeFileSync(ID_FILE, photo.id)
   console.log(`created: ${photo.id}`)
 } else if (cmd === 'cleanup') {

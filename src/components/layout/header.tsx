@@ -26,9 +26,9 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
   return (
     <header
       className={cn(
-        'z-50 h-16',
-        fixed && 'header-fixed peer/header sticky top-0 w-[inherit]',
-        offset > 10 && fixed ? 'shadow' : 'shadow-none',
+        'peer/header sticky top-0 z-50 h-16 w-[inherit]',
+        fixed && 'header-fixed',
+        offset > 10 ? 'shadow' : 'shadow-none',
         className
       )}
       {...props}
@@ -37,7 +37,6 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
         className={cn(
           'relative flex h-full items-center gap-3 p-4 sm:gap-4',
           offset > 10 &&
-            fixed &&
             'after:bg-background/20 after:absolute after:inset-0 after:-z-10 after:backdrop-blur-lg'
         )}
       >

@@ -12,7 +12,7 @@
 import exifr from 'exifr'
 import { readFileSync } from 'node:fs'
 
-const API_BASE = 'https://aurora-worker.bbbboy811.workers.dev'
+const API_BASE = 'https://aurora-worker.codercat.top'
 const ADMIN_API_KEY = 'aurora-admin-7a57749aa7ef4fb1a0e2c0cba81c035d'
 const FILE = 'test-photo.jpg'
 
@@ -33,8 +33,8 @@ const presignRes = await fetch(`${API_BASE}/api/upload-url`, {
   headers: { ...headers, 'Content-Type': 'application/json' },
   body: JSON.stringify({ filename: FILE }),
 })
-const presign = await presignRes.json()
-check('POST /api/upload-url', presignRes.ok && !!presign.uploadUrl, `key=${presign.key}`)
+const presign = (await presignRes.json()).data
+check('POST /api/upload-url', presignRes.ok && !!presign?.uploadUrl, `key=${presign?.key}`)
 
 // 3. 直传 R2
 const fileBuf = readFileSync(FILE)
@@ -72,13 +72,13 @@ const createRes = await fetch(`${API_BASE}/api/photos`, {
     mimeType: 'image/jpeg',
   }),
 })
-const photo = await createRes.json()
-check('POST /api/photos', createRes.ok && !!photo.id, `id=${photo.id}, slug=${photo.slug}`)
+const photo = (await createRes.json()).data
+check('POST /api/photos', createRes.ok && !!photo?.id, `id=${photo?.id}, slug=${photo?.slug}`)
 
 // 5. 列表验证
 const listRes = await fetch(`${API_BASE}/api/photos?tag=街拍`)
 const list = await listRes.json()
-check('GET /api/photos?tag=街拍', listRes.ok && list.total === 1 && list.data[0].title === 'E2E 测试作品')
+check('GET /api/photos?tag=街拍', listRes.ok && list.data?.total === 1 && list.data?.items?.[0]?.title === 'E2E 测试作品')
 
 // 6. 编辑验证
 const patchRes = await fetch(`${API_BASE}/api/photos/${photo.id}`, {
@@ -86,11 +86,11 @@ const patchRes = await fetch(`${API_BASE}/api/photos/${photo.id}`, {
   headers: { ...headers, 'Content-Type': 'application/json' },
   body: JSON.stringify({ title: 'E2E 测试作品 v2', category: 'landscape' }),
 })
-const patched = await patchRes.json()
-check('PATCH /api/photos/:id', patchRes.ok && patched.title === 'E2E 测试作品 v2' && patched.category === 'landscape')
+const patched = (await patchRes.json()).data
+check('PATCH /api/photos/:id', patchRes.ok && patched?.title === 'E2E 测试作品 v2' && patched?.category === 'landscape')
 
 // 7. R2 原图可访问 + EXIF 保留验证
-const r2Res = await fetch(photo.r2Url)
+const r2Res = await fetch(photo.urls.r2)
 const r2Buf = Buffer.from(await r2Res.arrayBuffer())
 const r2Exif = await exifr.parse(r2Buf, { tiff: true, exif: true, gps: true })
 check('R2 原图可访问且 EXIF 完整', r2Res.ok && r2Exif?.Make === 'TestCam' && r2Exif?.ISO === 400, `bytes=${r2Buf.length}, Make=${r2Exif?.Make}, ISO=${r2Exif?.ISO}`)
@@ -101,14 +101,14 @@ const delRes = await fetch(`${API_BASE}/api/photos/${photo.id}`, {
   headers,
 })
 const delJson = await delRes.json()
-check('DELETE /api/photos/:id', delRes.ok && delJson.success === true)
+check('DELETE /api/photos/:id', delRes.ok && delJson.code === 0)
 
-const r2After = await fetch(photo.r2Url)
+const r2After = await fetch(photo.urls.r2)
 check('R2 文件已同步删除', r2After.status === 404, `status=${r2After.status}`)
 
 const listAfter = await fetch(`${API_BASE}/api/photos`)
 const listAfterJson = await listAfter.json()
-check('数据库记录已删除', listAfterJson.total === 0)
+check('数据库记录已删除', listAfterJson.data?.total === 0)
 
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} 通过`)

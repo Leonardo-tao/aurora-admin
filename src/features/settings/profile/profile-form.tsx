@@ -1,8 +1,8 @@
 import { z } from 'zod'
+import { useEffect } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link } from '@tanstack/react-router'
-import { showSubmittedData } from '@/lib/show-submitted-data'
+import { useUser } from '@clerk/clerk-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,27 +15,17 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  useUpdateUserProfile,
+  useUserProfileQuery,
+} from '../data/queries'
 
 const profileFormSchema = z.object({
-  username: z
-    .string('请输入用户名')
-    .min(2, '用户名至少需要2个字符')
-    .max(30, '用户名不能超过30个字符'),
-  email: z.email({
-    error: (iss) =>
-      iss.input === undefined
-        ? '请选择要显示的邮箱'
-        : undefined,
-  }),
-  bio: z.string().max(160).min(4),
+  bio: z
+    .string()
+    .max(160, '简介不能超过160个字符')
+    .min(4, '简介至少需要4个字符'),
   urls: z
     .array(
       z.object({
@@ -47,21 +37,25 @@ const profileFormSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
-// This can come from your database or API.
-const defaultValues: Partial<ProfileFormValues> = {
-  bio: 'I own a computer.',
-  urls: [
-    { value: 'https://shadcn.com' },
-    { value: 'http://twitter.com/shadcn' },
-  ],
-}
-
 export function ProfileForm() {
+  const { isLoaded, user } = useUser()
+  const profileQuery = useUserProfileQuery()
+  const updateProfile = useUpdateUserProfile()
+
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
-    defaultValues,
+    defaultValues: { bio: '', urls: [] },
     mode: 'onChange',
   })
+
+  useEffect(() => {
+    if (profileQuery.data) {
+      form.reset({
+        bio: profileQuery.data.bio,
+        urls: profileQuery.data.urls,
+      })
+    }
+  }, [profileQuery.data, form])
 
   const { fields, append } = useFieldArray({
     name: 'urls',
@@ -71,50 +65,42 @@ export function ProfileForm() {
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((data) => showSubmittedData(data))}
+        onSubmit={form.handleSubmit((data) =>
+          updateProfile.mutate({
+            bio: data.bio,
+            urls: data.urls ?? [],
+          })
+        )}
         className='space-y-8'
       >
-        <FormField
-          control={form.control}
-          name='username'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>用户名</FormLabel>
-              <FormControl>
-                <Input placeholder='请输入用户名' {...field} />
-              </FormControl>
-              <FormDescription>
-                这是您的公开显示名称，可以是真名或昵称。每30天只能修改一次。
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name='email'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>邮箱</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder='选择要显示的已验证邮箱' />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value='m@example.com'>m@example.com</SelectItem>
-                  <SelectItem value='m@google.com'>m@google.com</SelectItem>
-                  <SelectItem value='m@support.com'>m@support.com</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormDescription>
-                您可以在<Link to='/'>邮箱设置</Link>中管理已验证的邮箱地址。
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <FormItem>
+          <FormLabel>用户名</FormLabel>
+          <FormControl>
+            <Input
+              value={isLoaded ? (user?.username ?? '') : ''}
+              placeholder='未设置'
+              readOnly
+              disabled
+            />
+          </FormControl>
+          <FormDescription>
+            用户名来自 Clerk 账户系统，如需修改请前往 Clerk 账户设置。
+          </FormDescription>
+        </FormItem>
+        <FormItem>
+          <FormLabel>邮箱</FormLabel>
+          <FormControl>
+            <Input
+              value={isLoaded ? (user?.primaryEmailAddress?.emailAddress ?? '') : ''}
+              placeholder='未绑定'
+              readOnly
+              disabled
+            />
+          </FormControl>
+          <FormDescription>
+            邮箱由 Clerk 账户系统管理，登录与通知均使用该地址。
+          </FormDescription>
+        </FormItem>
         <FormField
           control={form.control}
           name='bio'
@@ -167,7 +153,12 @@ export function ProfileForm() {
             添加网址
           </Button>
         </div>
-        <Button type='submit'>更新资料</Button>
+        <Button
+          type='submit'
+          disabled={profileQuery.isPending || updateProfile.isPending}
+        >
+          {updateProfile.isPending ? '保存中...' : '更新资料'}
+        </Button>
       </form>
     </Form>
   )

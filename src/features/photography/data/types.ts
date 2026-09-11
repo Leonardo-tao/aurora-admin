@@ -1,29 +1,27 @@
 /**
  * Worker API 返回的摄影作品对象（与 aurora-worker/src/routes/photos.ts 的 Photo 一致）。
+ * 按语义分区：根节点基础元信息 + urls / file / exif。
  */
-export interface Photo {
-  id: string
-  title: string
-  slug: string
-  description: string | null
-  category: string | null
-  tags: string[]
-  featured: boolean
-  views: number
-  likes: number
-  downloads: number
-  r2Key: string
-  r2Url: string
+export interface PhotoUrls {
+  /** R2 原图直链 */
+  r2: string
   /** 展示大图（webp, w=1600） */
-  displayUrl: string
+  display: string
   /** 列表缩略图（webp, w=400） */
-  thumbUrl: string
+  thumb: string
   /** 下载原图（jpeg, 保留 EXIF） */
-  downloadUrl: string
+  download: string
+}
+
+export interface PhotoFile {
+  r2Key: string
+  size: number | null
+  mimeType: string | null
+}
+
+export interface PhotoExif {
   width: number | null
   height: number | null
-  fileSize: number | null
-  mimeType: string | null
   cameraMake: string | null
   cameraModel: string | null
   lensMake: string | null
@@ -35,10 +33,26 @@ export interface Photo {
   gpsLatitude: number | null
   gpsLongitude: number | null
   gpsLocation: string | null
-  date: string | null
   dateTaken: string | null
+}
+
+export interface Photo {
+  id: string
+  title: string
+  slug: string
+  description: string | null
+  category: string | null
+  tags: string[]
+  featured: boolean
+  views: number
+  likes: number
+  downloads: number
+  date: string | null
   createdAt: string
   updatedAt: string
+  urls: PhotoUrls
+  file: PhotoFile
+  exif: PhotoExif
 }
 
 /** POST/PATCH /api/photos 请求体 */
@@ -69,9 +83,9 @@ export interface PhotoInput {
   mimeType?: string | null
 }
 
-/** GET /api/photos 响应 */
+/** GET /api/photos 响应（解包后的 data） */
 export interface PhotosResponse {
-  data: Photo[]
+  items: Photo[]
   total: number
   page: number
   limit: number

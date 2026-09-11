@@ -1,17 +1,9 @@
 import { type ColumnDef } from '@tanstack/react-table'
-import { Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { MoreHorizontal, Pencil, Trash2, Download } from 'lucide-react'
+import { Star, Pencil, Trash2, Download } from 'lucide-react'
+import { API_BASE } from '@/lib/api'
 import { type Photo } from '../data/types'
 
 function formatBytes(bytes: number | null): string {
@@ -64,19 +56,20 @@ export function getPhotosColumns({
       id: 'preview',
       header: '预览',
       cell: ({ row }) => (
-        <a
-          href={row.original.displayUrl}
-          target='_blank'
-          rel='noreferrer'
-          className='block h-12 w-16 shrink-0 overflow-hidden rounded-md bg-muted'
+        <button
+          type='button'
+          onClick={() => onEdit(row.original)}
+          title='点击编辑'
+          aria-label={`编辑 ${row.original.title}`}
+          className='focus-visible:ring-ring block h-12 w-16 shrink-0 cursor-pointer overflow-hidden rounded-md bg-muted outline-none focus-visible:ring-2'
         >
           <img
-            src={row.original.thumbUrl}
+            src={row.original.urls.thumb}
             alt={row.original.title}
             loading='lazy'
             className='h-full w-full object-cover transition-opacity'
           />
-        </a>
+        </button>
       ),
       enableSorting: false,
       enableHiding: false,
@@ -133,69 +126,77 @@ export function getPhotosColumns({
       ),
     },
     {
-      accessorKey: 'cameraModel',
+      id: 'cameraModel',
       header: '相机',
       cell: ({ row }) => (
         <span className='text-muted-foreground max-w-36 truncate text-sm'>
-          {row.original.cameraModel ?? '-'}
+          {row.original.exif.cameraModel ?? '-'}
         </span>
       ),
     },
     {
-      accessorKey: 'dateTaken',
+      id: 'dateTaken',
       header: '拍摄时间',
       cell: ({ row }) => (
         <span className='text-muted-foreground text-sm'>
-          {row.original.dateTaken
-            ? new Date(row.original.dateTaken).toLocaleDateString('zh-CN')
+          {row.original.exif.dateTaken
+            ? new Date(row.original.exif.dateTaken).toLocaleDateString('zh-CN')
             : '-'}
         </span>
       ),
     },
     {
-      accessorKey: 'fileSize',
+      id: 'fileSize',
       header: '大小',
       cell: ({ row }) => (
         <span className='text-muted-foreground text-sm'>
-          {formatBytes(row.original.fileSize)}
+          {formatBytes(row.original.file.size)}
         </span>
       ),
     },
     {
       id: 'actions',
+      header: '操作',
+      enableSorting: false,
+      enableHiding: false,
       cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant='ghost'
-              className='data-[state=open]:bg-muted flex h-8 w-8 p-0'
+        <div className='flex items-center gap-1'>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='size-8'
+            title='编辑作品'
+            aria-label={`编辑 ${row.original.title}`}
+            onClick={() => onEdit(row.original)}
+          >
+            <Pencil className='size-4' />
+          </Button>
+          <Button
+            asChild
+            variant='ghost'
+            size='icon'
+            className='size-8'
+            title='下载原图'
+          >
+            <a
+              href={`${API_BASE}/api/photos/${row.original.id}/download`}
+              download
+              aria-label={`下载 ${row.original.title}`}
             >
-              <MoreHorizontal className='size-4' />
-              <span className='sr-only'>打开菜单</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align='end' className='w-40'>
-            <DropdownMenuLabel>操作</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onEdit(row.original)}>
-              <Pencil className='size-4' />
-              编辑
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a href={row.original.downloadUrl} download>
-                <Download className='size-4' />
-                下载原图（保留 EXIF）
-              </a>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant='destructive'
-              onClick={() => onDelete(row.original)}
-            >
-              <Trash2 className='size-4' />
-              删除
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <Download className='size-4' />
+            </a>
+          </Button>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='text-destructive hover:text-destructive size-8'
+            title='删除作品'
+            aria-label={`删除 ${row.original.title}`}
+            onClick={() => onDelete(row.original)}
+          >
+            <Trash2 className='size-4' />
+          </Button>
+        </div>
       ),
     },
   ]

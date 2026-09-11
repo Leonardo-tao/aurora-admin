@@ -36,6 +36,22 @@ export class ApiError extends Error {
   }
 }
 
+/** Worker 统一响应封装 {code, data, msg}；code=0 表示成功 */
+interface ApiEnvelope<T> {
+  code: number
+  data: T | null
+  msg: string
+}
+
+function isEnvelope(body: unknown): body is ApiEnvelope<unknown> {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    'code' in body &&
+    typeof (body as { code?: unknown }).code === 'number'
+  )
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -43,6 +59,8 @@ async function request<T>(
   const token = await getAuthToken()
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    // 绕过 HTTP 缓存，保证变更后重取数据始终新鲜（Worker 端公开 GET 带 max-age=60）
+    cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -53,8 +71,9 @@ async function request<T>(
   if (!res.ok) {
     let message = `请求失败 (${res.status})`
     try {
-      const body = (await res.json()) as { error?: string }
-      if (body?.error) message = body.error
+      const body = (await res.json()) as { msg?: string; error?: string }
+      if (body?.msg) message = body.msg
+      else if (body?.error) message = body.error
     } catch {
       // ignore json parse error
     }
@@ -64,7 +83,17 @@ async function request<T>(
   // 204 或空响应
   if (res.status === 204) return undefined as T
   const text = await res.text()
-  return (text ? JSON.parse(text) : undefined) as T
+  if (!text) return undefined as T
+
+  const body: unknown = JSON.parse(text)
+  // 统一解包 {code, data, msg}；非封装格式（如二进制/旧响应）原样返回
+  if (isEnvelope(body)) {
+    if (body.code !== 0) {
+      throw new ApiError(body.msg || `请求失败 (${body.code})`, body.code)
+    }
+    return body.data as T
+  }
+  return body as T
 }
 
 export const api = {

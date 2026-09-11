@@ -1,13 +1,15 @@
-import { Upload } from 'lucide-react'
+import { useIsFetching, useQueryClient } from '@tanstack/react-query'
+import { RefreshCw, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { cn } from '@/lib/utils'
+import { photoKeys } from './data/queries'
+import { PhotoBulkDeleteDialog } from './components/photo-bulk-delete-dialog'
 import { PhotoDeleteDialog } from './components/photo-delete-dialog'
-import { PhotoEditDrawer } from './components/photo-edit-drawer'
 import { PhotoUploadDialog } from './components/photo-upload-dialog'
 import { PhotosProvider, usePhotos } from './components/photos-provider'
 import { PhotosTable } from './components/photos-table'
@@ -20,18 +22,13 @@ export function Photography() {
         <div className='ms-auto flex items-center space-x-4'>
           <ThemeSwitch />
           <ConfigDrawer />
-          <ProfileDropdown />
         </div>
       </Header>
 
-      <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
+      <Main fixed fluid className='gap-4 sm:gap-6'>
         <div className='flex flex-wrap items-end justify-between gap-2'>
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>摄影作品</h2>
-            <p className='text-muted-foreground'>
-              管理摄影作品：上传（EXIF 自动解析）、编辑元数据、删除（同步清理
-              R2）
-            </p>
           </div>
           <PhotosPrimaryButtons />
         </div>
@@ -45,8 +42,21 @@ export function Photography() {
 
 function PhotosPrimaryButtons() {
   const { setOpen } = usePhotos()
+  const queryClient = useQueryClient()
+  const isFetching = useIsFetching({ queryKey: photoKeys.all })
   return (
     <div className='flex items-center gap-2'>
+      <Button
+        variant='outline'
+        size='icon'
+        aria-label='刷新'
+        title='刷新列表'
+        onClick={() =>
+          void queryClient.invalidateQueries({ queryKey: photoKeys.all })
+        }
+      >
+        <RefreshCw className={cn('size-4', isFetching > 0 && 'animate-spin')} />
+      </Button>
       <Button onClick={() => setOpen('upload')}>
         <Upload className='size-4' />
         上传作品
@@ -56,20 +66,19 @@ function PhotosPrimaryButtons() {
 }
 
 function PhotosDialogs() {
-  const { open, setOpen, currentRow, setCurrentRow } = usePhotos()
+  const {
+    open,
+    setOpen,
+    currentRow,
+    setCurrentRow,
+    selectedRows,
+    setSelectedRows,
+  } = usePhotos()
   return (
     <>
       <PhotoUploadDialog
         open={open === 'upload'}
         onOpenChange={(v) => setOpen(v ? 'upload' : null)}
-      />
-      <PhotoEditDrawer
-        open={open === 'update'}
-        onOpenChange={(v) => {
-          setOpen(v ? 'update' : null)
-          if (!v) setCurrentRow(null)
-        }}
-        currentRow={currentRow}
       />
       <PhotoDeleteDialog
         open={open === 'delete'}
@@ -78,6 +87,14 @@ function PhotosDialogs() {
           if (!v) setCurrentRow(null)
         }}
         currentRow={currentRow}
+      />
+      <PhotoBulkDeleteDialog
+        open={open === 'bulk-delete'}
+        onOpenChange={(v) => {
+          setOpen(v ? 'bulk-delete' : null)
+          if (!v) setSelectedRows([])
+        }}
+        selectedRows={selectedRows}
       />
     </>
   )

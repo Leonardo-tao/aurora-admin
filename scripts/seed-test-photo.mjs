@@ -6,7 +6,7 @@
 import exifr from 'exifr'
 import { readFileSync, existsSync } from 'node:fs'
 
-const API_BASE = 'https://aurora-worker.bbbboy811.workers.dev'
+const API_BASE = 'https://aurora-worker.codercat.top'
 const ADMIN_API_KEY = 'aurora-admin-7a57749aa7ef4fb1a0e2c0cba81c035d'
 const FILE = process.argv[2] ?? 'test-photo.jpg'
 const SLUG = process.argv[3] ?? 'e2e-seed-test'
@@ -35,8 +35,9 @@ const presignRes = await fetch(`${API_BASE}/api/upload-url`, {
   headers: { ...headers, 'Content-Type': 'application/json' },
   body: JSON.stringify({ filename: FILE }),
 })
-const presign = await presignRes.json()
-if (!presignRes.ok) throw new Error(`预签名失败: ${JSON.stringify(presign)}`)
+const presignJson = await presignRes.json()
+if (!presignRes.ok) throw new Error(`预签名失败: ${JSON.stringify(presignJson)}`)
+const presign = presignJson.data
 
 // 2. 直传 R2
 const putRes = await fetch(presign.uploadUrl, { method: 'PUT', body: fileBuf })
@@ -73,8 +74,9 @@ const createRes = await fetch(`${API_BASE}/api/photos`, {
     mimeType: FILE.endsWith('.png') ? 'image/png' : 'image/jpeg',
   }),
 })
-const photo = await createRes.json()
-if (!createRes.ok) throw new Error(`写入元数据失败: ${JSON.stringify(photo)}`)
+const photoJson = await createRes.json()
+if (!createRes.ok) throw new Error(`写入元数据失败: ${JSON.stringify(photoJson)}`)
+const photo = photoJson.data
 
 console.log('上传成功:', JSON.stringify(photo, null, 2))
 process.exit(0)

@@ -1,8 +1,8 @@
 import { z } from 'zod'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link } from '@tanstack/react-router'
-import { showSubmittedData } from '@/lib/show-submitted-data'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -16,6 +16,10 @@ import {
 } from '@/components/ui/form'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
+import {
+  useUpdateUserSettings,
+  useUserSettingsQuery,
+} from '../data/queries'
 
 const notificationsFormSchema = z.object({
   type: z.enum(['all', 'mentions', 'none'], {
@@ -42,15 +46,35 @@ const defaultValues: Partial<NotificationsFormValues> = {
 }
 
 export function NotificationsForm() {
+  const settingsQuery = useUserSettingsQuery()
+  const updateSettings = useUpdateUserSettings()
+
   const form = useForm<NotificationsFormValues>({
     resolver: zodResolver(notificationsFormSchema),
     defaultValues,
   })
 
+  useEffect(() => {
+    const saved = settingsQuery.data?.notifications as
+      | Partial<NotificationsFormValues>
+      | undefined
+    if (!saved) return
+    form.reset({
+      type: saved.type,
+      mobile: saved.mobile ?? false,
+      communication_emails: saved.communication_emails ?? false,
+      social_emails: saved.social_emails ?? true,
+      marketing_emails: saved.marketing_emails ?? false,
+      security_emails: saved.security_emails ?? true,
+    })
+  }, [settingsQuery.data, form])
+
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((data) => showSubmittedData(data))}
+        onSubmit={form.handleSubmit((data) =>
+          updateSettings.mutate({ notifications: { ...data } })
+        )}
         className='space-y-8'
       >
         <FormField
@@ -213,7 +237,12 @@ export function NotificationsForm() {
             </FormItem>
           )}
         />
-        <Button type='submit'>更新通知设置</Button>
+        <Button
+          type='submit'
+          disabled={updateSettings.isPending}
+        >
+          {updateSettings.isPending ? '保存中...' : '更新通知设置'}
+        </Button>
       </form>
     </Form>
   )

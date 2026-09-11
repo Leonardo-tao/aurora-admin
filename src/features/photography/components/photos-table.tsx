@@ -9,9 +9,9 @@ import {
 } from '@tanstack/react-table'
 import { Search, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useDebounce } from '@/hooks/use-debounce'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -27,16 +28,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useDebounce } from '@/hooks/use-debounce'
-import { getPhotosColumns } from './photos-columns'
-import { usePhotos } from './photos-provider'
 import {
   useCategoriesQuery,
-  useDeletePhoto,
   usePhotosQuery,
   useTagsQuery,
 } from '../data/queries'
 import { type Photo } from '../data/types'
+import { getPhotosColumns } from './photos-columns'
+import { usePhotos } from './photos-provider'
 
 const route = getRouteApi('/_authenticated/photos/')
 
@@ -51,7 +50,7 @@ type SearchParams = {
 export function PhotosTable() {
   const search = route.useSearch()
   const navigate = useNavigate()
-  const { setOpen, setCurrentRow } = usePhotos()
+  const { setOpen, setCurrentRow, setSelectedRows } = usePhotos()
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
 
   // 路由 search 为 optional，统一解析出确定值
@@ -66,7 +65,10 @@ export function PhotosTable() {
   const debouncedFilter = useDebounce(filterInput, 400)
   React.useEffect(() => {
     if (debouncedFilter !== search.filter) {
-      navigate({ to: '/photos', search: { ...search, filter: debouncedFilter, page: 1 } })
+      navigate({
+        to: '/photos',
+        search: { ...search, filter: debouncedFilter, page: 1 },
+      })
     }
   }, [debouncedFilter]) // eslint-disable-line react-hooks/exhaustive-deps
   // 外部变化（清空按钮）时同步本地输入
@@ -90,16 +92,18 @@ export function PhotosTable() {
     [page, pageSize]
   )
 
-  const photos = data?.data ?? []
+  const photos = data?.items ?? []
   const total = data?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
 
   const onEdit = React.useCallback(
     (photo: Photo) => {
-      setCurrentRow(photo)
-      setOpen('update')
+      void navigate({
+        to: '/photos/$photoId/edit',
+        params: { photoId: photo.id },
+      })
     },
-    [setCurrentRow, setOpen]
+    [navigate]
   )
   const onDelete = React.useCallback(
     (photo: Photo) => {
@@ -125,8 +129,7 @@ export function PhotosTable() {
     pageCount,
     rowCount: total,
     onPaginationChange: (updater) => {
-      const next =
-        typeof updater === 'function' ? updater(pagination) : updater
+      const next = typeof updater === 'function' ? updater(pagination) : updater
       navigate({
         to: '/photos',
         search: {
@@ -144,19 +147,15 @@ export function PhotosTable() {
     setRowSelection({})
   }
 
-  const deleteMutation = useDeletePhoto()
   const selectedIds = table.getSelectedRowModel().rows.map((r) => r.original.id)
-  const onBulkDelete = async () => {
-    if (!confirm(`确定删除选中的 ${selectedIds.length} 个作品？R2 文件将同时删除。`)) return
-    for (const id of selectedIds) {
-      await deleteMutation.mutateAsync(id)
-    }
-    setRowSelection({})
-    void refetch()
+  const onBulkDelete = () => {
+    // 与单行删除一致：打开 AlertDialog 确认，不使用浏览器原生 confirm
+    setSelectedRows(table.getSelectedRowModel().rows.map((r) => r.original))
+    setOpen('bulk-delete')
   }
 
   return (
-    <div className='flex flex-1 flex-col gap-4'>
+    <div className='flex min-h-0 flex-1 flex-col gap-4'>
       {/* 工具栏 */}
       <div className='flex flex-wrap items-center gap-2'>
         <div className='relative'>
@@ -178,9 +177,7 @@ export function PhotosTable() {
         </div>
         <Select
           value={category || 'all'}
-          onValueChange={(v) =>
-            setParam({ category: v === 'all' ? '' : v })
-          }
+          onValueChange={(v) => setParam({ category: v === 'all' ? '' : v })}
         >
           <SelectTrigger className='h-8 w-32'>
             <SelectValue placeholder='分类' />
@@ -221,9 +218,9 @@ export function PhotosTable() {
       </div>
 
       {/* 表格 */}
-      <div className='overflow-hidden rounded-md border'>
+      <div className='min-h-0 flex-1 overflow-auto rounded-md border [&_[data-slot=table-container]]:overflow-visible'>
         <Table>
-          <TableHeader>
+          <TableHeader className='bg-background sticky top-0 z-10 shadow-[inset_0_-1px_0_0_var(--border)]'>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
@@ -252,26 +249,43 @@ export function PhotosTable() {
               ))
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className='h-24 text-center'>
+                <TableCell
+                  colSpan={columns.length}
+                  className='h-24 text-center'
+                >
                   加载失败：{error.message}
-                  <Button variant='outline' size='sm' className='ms-2' onClick={() => refetch()}>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    className='ms-2'
+                    onClick={() => refetch()}
+                  >
                     重试
                   </Button>
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className='h-24 text-center'>
+                <TableCell
+                  colSpan={columns.length}
+                  className='h-24 text-center'
+                >
                   暂无作品，点击右上角「上传作品」添加。
                 </TableCell>
               </TableRow>

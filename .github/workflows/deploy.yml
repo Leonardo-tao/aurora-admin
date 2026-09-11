@@ -47,7 +47,7 @@ jobs:
       - name: Create .env
         run: |
           cat > .env <<EOF
-          VITE_API_BASE=${{ secrets.VITE_API_BASE || 'https://aurora-worker.bbbboy811.workers.dev' }}
+          VITE_API_BASE=${{ secrets.VITE_API_BASE || 'https://aurora-worker.codercat.top' }}
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           EOF
 
