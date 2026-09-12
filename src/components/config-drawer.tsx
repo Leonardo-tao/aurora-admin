@@ -72,7 +72,7 @@ export function ConfigDrawer() {
         </div>
         <SheetFooter className='gap-2'>
           <Button
-            variant='destructive'
+            variant='outline'
             onClick={handleReset}
             aria-label='重置所有设置为默认值'
           >
@@ -164,7 +164,6 @@ function RadioGroupItem({
       <div
         className='mt-1 text-xs'
         id={`${item.value}-description`}
-        aria-live='polite'
       >
         {item.label}
       </div>

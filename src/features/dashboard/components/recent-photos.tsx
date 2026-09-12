@@ -1,6 +1,44 @@
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { ImageOff } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePhotosQuery } from '@/features/photography/data/queries'
+
+function PhotoThumb({
+  photo,
+}: {
+  photo: { id: string; title: string; urls: { thumb: string; display: string } }
+}) {
+  const [failed, setFailed] = useState(false)
+
+  return (
+    <a
+      href={photo.urls.display}
+      target='_blank'
+      rel='noreferrer'
+      title={photo.title}
+      className='group relative block aspect-square overflow-hidden rounded-md bg-muted'
+    >
+      {failed ? (
+        <ImageOff
+          className='text-muted-foreground/60 absolute inset-0 m-auto size-6'
+          aria-hidden='true'
+        />
+      ) : (
+        <img
+          src={photo.urls.thumb}
+          alt={photo.title}
+          loading='lazy'
+          onError={() => setFailed(true)}
+          className='h-full w-full object-cover transition-transform group-hover:scale-105'
+        />
+      )}
+      <span className='bg-foreground/60 absolute inset-x-0 bottom-0 truncate px-1.5 py-0.5 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100'>
+        {photo.title}
+      </span>
+    </a>
+  )
+}
 
 /** 最新上传的作品缩略图（Transformations webp） */
 export function RecentPhotos() {
@@ -33,24 +71,7 @@ export function RecentPhotos() {
   return (
     <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
       {photos.map((photo) => (
-        <a
-          key={photo.id}
-          href={photo.urls.display}
-          target='_blank'
-          rel='noreferrer'
-          title={photo.title}
-          className='group relative block aspect-square overflow-hidden rounded-md bg-muted'
-        >
-          <img
-            src={photo.urls.thumb}
-            alt={photo.title}
-            loading='lazy'
-            className='h-full w-full object-cover transition-transform group-hover:scale-105'
-          />
-          <span className='bg-foreground/60 absolute inset-x-0 bottom-0 truncate px-1.5 py-0.5 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100'>
-            {photo.title}
-          </span>
-        </a>
+        <PhotoThumb key={photo.id} photo={photo} />
       ))}
     </div>
   )

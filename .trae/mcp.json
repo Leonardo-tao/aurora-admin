@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "shadcn-ui": {
+      "command": "npx",
+      "args": [
+        "shadcn@latest",
+        "mcp"
+      ],
+      "env": {},
+      "fromGalleryId": "byted-mcp.shadcn-ui"
+    }
+  }
+}

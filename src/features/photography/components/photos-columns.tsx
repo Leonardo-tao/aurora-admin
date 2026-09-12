@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Star, Pencil, Trash2, Download } from 'lucide-react'
+import { ImageOff, Star, Pencil, Trash2, Download } from 'lucide-react'
 import { API_BASE } from '@/lib/api'
 import { type Photo } from '../data/types'
 
@@ -56,20 +57,10 @@ export function getPhotosColumns({
       id: 'preview',
       header: '预览',
       cell: ({ row }) => (
-        <button
-          type='button'
-          onClick={() => onEdit(row.original)}
-          title='点击编辑'
-          aria-label={`编辑 ${row.original.title}`}
-          className='focus-visible:ring-ring block h-12 w-16 shrink-0 cursor-pointer overflow-hidden rounded-md bg-muted outline-none focus-visible:ring-2'
-        >
-          <img
-            src={row.original.urls.thumb}
-            alt={row.original.title}
-            loading='lazy'
-            className='h-full w-full object-cover transition-opacity'
-          />
-        </button>
+        <PreviewThumb
+          photo={row.original}
+          onEdit={() => onEdit(row.original)}
+        />
       ),
       enableSorting: false,
       enableHiding: false,
